@@ -21,6 +21,15 @@ You must have the [CardWallet backend integration](https://github.com/rozgonyiad
 
 ## 📦 Installation
 
+### HACS (Recommended)
+
+Add this repository to HACS as a custom frontend:
+
+- HACS → Frontend → "+" → "Custom repositories"
+- Add this repository URL: `https://github.com/rozgonyiadam/lovelace-cardwallet`
+- Type: Dashboard
+- Install and reload Home Assistant.
+
 ### Manual Installation
 
 #### 1. Copy frontend files (JS, libs)
@@ -85,5 +94,5 @@ Clicking a card opens a larger view of the code with actions.
 
 ## 🙏 Credits
 
-- [QRCode.js](https://github.com/davidshimjs/qrcodejs) — Used for QR code generation
+- [node-qrcode](https://github.com/soldair/node-qrcode) — Used for QR code generation
 - [JsBarcode](https://github.com/lindell/JsBarcode) — Used for barcode rendering

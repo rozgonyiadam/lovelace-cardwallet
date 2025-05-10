@@ -1,5 +1,6 @@
 {
   "name": "Lovelace CardWallet Card",
   "render_readme": true,
-  "filename": "cardwallet-card.js"
+  "filename": "cardwallet-card.js",
+  "content_in_root": false
 }
