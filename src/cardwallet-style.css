@@ -1,0 +1,144 @@
+.tabs {
+	display: flex;
+	justify-content: space-around;
+	margin-top: 8px;
+}
+
+.tab {
+	flex: 1;
+	padding: 0.5em;
+	text-align: center;
+	cursor: pointer;
+	background: #333;
+	color: #fff;
+}
+
+.tab.active {
+	background: #555;
+	font-weight: bold;
+}
+
+.cardlist {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	max-height: 300px;
+	overflow-y: auto;
+}
+
+.card {
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	padding: 0.5em;
+	border: 1px solid #ccc;
+	cursor: pointer;
+	min-height: 3.5em;
+}
+
+.card small {
+	font-size: 0.85em;
+	color: #bbb;
+}
+
+.popup {
+	position: fixed;
+	top: 10%;
+	left: 50%;
+	transform: translateX(-50%);
+	background: white;
+	padding: 1em;
+	border: 2px solid #ccc;
+	z-index: 1000;
+	box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
+}
+
+.card-title {
+	font-weight: bold;
+	font-size: 1.5em;
+	color: black;
+}
+
+.popup .code {
+	margin-top: 12px;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+}
+
+.popup .code canvas {
+	max-width: 90vw;
+	height: auto;
+}
+
+.button-group {
+	display: flex;
+	justify-content: center;
+	gap: 10px;
+	margin-top: 1em;
+}
+
+.button-group button {
+	background: #666;
+	color: white;
+	padding: 8px 14px;
+	border: none;
+	font-size: 0.95em;
+	cursor: pointer;
+}
+
+.button-group button:hover {
+	background: #444;
+}
+
+ha-icon {
+	vertical-align: middle;
+	margin-right: 4px;
+}
+
+.new-card-row {
+	display: flex;
+	gap: 6px;
+	align-items: stretch;
+	width: 100%;
+	box-sizing: border-box;
+	margin-top: 1em;
+}
+
+.new-card-row input {
+	flex: 1;
+	min-width: 0;
+	padding: 6px;
+	box-sizing: border-box;
+}
+
+.new-card-row button {
+	flex: 0 0 auto;
+	padding: 6px;
+	background-color: #444;
+	color: white;
+	border: none;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	box-sizing: border-box;
+	cursor: pointer;
+}
+
+.new-card-row button ha-icon {
+	color: white;
+}
+
+.close-btn {
+	position: absolute;
+	top: 8px;
+	right: 8px;
+	cursor: pointer;
+	--mdc-icon-size: 24px;
+	color: #888;
+	transition: color 0.2s;
+}
+
+.close-btn:hover {
+	color: #e00;
+}

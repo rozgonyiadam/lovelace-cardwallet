@@ -1,0 +1,15 @@
+{
+  "name": "lovelace-cardwallet",
+  "version": "1.0.0",
+  "description": "CardWallet Lovelace card",
+  "scripts": {
+    "build": "esbuild src/cardwallet-main.js --bundle --minify --outfile=dist/cardwallet-card.js --loader:.css=text --format=esm"
+  },
+  "devDependencies": {
+    "esbuild": "^0.20.2"
+  },
+  "dependencies": {
+    "jsbarcode": "^3.11.6",
+    "qrcode": "^1.5.4"
+  }
+}
