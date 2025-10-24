@@ -34,7 +34,7 @@ Add this repository to HACS as a custom frontend:
 
 #### 1. Copy frontend files (JS, libs)
 
-Copy the `cardwallet-card.js` file and the entire `vendor` folder into your Home Assistant `www/cardwallet/` directory.
+Copy the `cardwallet-card.js` file into your Home Assistant `www/cardwallet/` directory.
 
 Home Assistant serves `www/` as `/local/`, so `www/cardwallet/qrcode.min.js` becomes available at `/local/cardwallet/qrcode.min.js`.
 

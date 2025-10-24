@@ -2,6 +2,55 @@
 import JsBarcode from 'jsbarcode';
 import styleContent from './cardwallet-style.css' assert { type: 'text' };
 
+const DIGIT_ONLY_FORMATS = new Set([
+  "EAN", "EAN13", "EAN8", "UPC", "ITF", "ITF14",
+  "MSI", "MSI10", "MSI11", "MSI1010", "MSI1110", "pharmacode"
+]);
+
+function sanitizeCode(value, fmt) {
+  let s = String(value ?? "")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]/g, "");
+  if (DIGIT_ONLY_FORMATS.has(fmt)) s = s.replace(/\D/g, "");
+  return s;
+}
+
+function renderBarcodeCentral(target, code, fmt, opts = {}, errorTarget = null) {
+  const clean = sanitizeCode(code, fmt);
+  if (target instanceof HTMLCanvasElement) {
+    const ctx = target.getContext("2d");
+    if (ctx) ctx.clearRect(0, 0, target.width, target.height);
+  } else {
+    while (target.firstChild) target.removeChild(target.firstChild);
+  }
+  if (errorTarget) errorTarget.style.display = "none";
+
+  try {
+    JsBarcode(target, clean, {
+      format: fmt,
+      width: 5,
+      height: 80,
+      ...opts
+    });
+    return { ok: true };
+  } catch (err) {
+    const msg = `Invalid input for ${fmt}.` + (err?.message ? ` (${err.message})` : "");
+    if (errorTarget) {
+      errorTarget.textContent = msg;
+      errorTarget.style.display = "block";
+    } else if (target && target.parentElement) {
+      const div = document.createElement("div");
+      div.className = "error";
+      div.style.cssText = "color:red;font-size:0.9em;";
+      div.textContent = msg;
+      target.replaceWith(div);
+    }
+
+    //console.error("Barcode render error:", err);
+    return { ok: false, message: msg };
+  }
+}
+
 class CardWalletCard extends HTMLElement {
   constructor() {
     super();
@@ -58,8 +107,10 @@ class CardWalletCard extends HTMLElement {
 
     const all = await this._hass.callApi("get", "cardwallet");
     const uid = this._hass.user.id;
-    this.ownCards = all.filter(c => c.user_id === uid);
-    this.otherCards = all.filter(c => c.user_id !== uid);
+
+    // normalize format for old cards
+    this.ownCards = all.filter(c => c.user_id === uid).map(c => ({ ...c, format: c.format || "CODE128" }));
+    this.otherCards = all.filter(c => c.user_id !== uid).map(c => ({ ...c, format: c.format || "CODE128" }));
     this.render();
   }
 
@@ -90,7 +141,8 @@ class CardWalletCard extends HTMLElement {
       name,
       code,
       owner: this._hass.user.name,
-      user_id: this._hass.user.id
+      user_id: this._hass.user.id,
+      format: "CODE128" // default for new cards
     });
 
     this._inputState = { name: "", code: "" };
@@ -108,17 +160,112 @@ class CardWalletCard extends HTMLElement {
   }
 
   async updateCard(card) {
-    const newName = prompt("New name:", card.name);
-    if (newName === null) return;
-    await this._hass.callApi("put", `cardwallet/${card.card_id}`, {
-      user_id: card.user_id,
-      name: newName
-    });
+    const supportedFormats = [
+      "CODE128", "CODE128A", "CODE128B", "CODE128C",
+      "EAN13", "EAN8",
+      "UPC",
+      "CODE39",
+      "ITF14", "ITF",
+      "MSI", "MSI10", "MSI11", "MSI1010", "MSI1110",
+      "pharmacode", "codabar", "CODE93"
+    ];
 
-    if (this.selectedCard && this.selectedCard.card_id === card.card_id) {
-      this.selectedCard.name = newName;
-    }
-    this.loadCards();
+    const dialog = document.createElement("div");
+    dialog.className = "edit-dialog";
+    dialog.innerHTML = `
+      <div class="dialog-content">
+        <label>Name</label>
+        <input id="edit-name" type="text" value="${card.name}" />
+        <label>Default barcode format</label>
+        <select id="edit-format">
+          ${supportedFormats
+            .map(
+              (f) =>
+                `<option value="${f}" ${f === (card.format || "CODE128") ? "selected" : ""}>${f}</option>`
+            )
+            .join("")}
+        </select>
+
+        <div id="preview-wrap" style="margin-top:10px; text-align:center;">
+          <canvas id="preview-canvas"></canvas>
+          <div id="preview-error" style="color:red; font-size:0.9em; display:none;"></div>
+        </div>
+
+        <div class="btn-row">
+          <button id="save-btn"><ha-icon icon="mdi:content-save"></ha-icon> Save</button>
+          <button id="cancel-btn"><ha-icon icon="mdi:close"></ha-icon> Cancel</button>
+        </div>
+      </div>
+    `;
+
+    // inline style (kept same as before)
+    dialog.style.cssText = `
+      position: fixed; top:0; left:0; right:0; bottom:0;
+      background:rgba(0,0,0,0.4);
+      display:flex; align-items:center; justify-content:center;
+      z-index:1000;
+    `;
+    dialog.querySelector(".dialog-content").style.cssText = `
+      background:#fff; padding:1em; border-radius:8px; width:260px;
+      display:flex; flex-direction:column; gap:0.5em;
+    `;
+
+    this.shadowRoot.appendChild(dialog);
+
+    const nameInput = dialog.querySelector("#edit-name");
+    const formatSelect = dialog.querySelector("#edit-format");
+    const previewCanvas = dialog.querySelector("#preview-canvas");
+    const errorDiv = dialog.querySelector("#preview-error");
+
+    // --- live preview ---
+    const renderPreview = () => {
+      const fmt = formatSelect.value;
+      renderBarcodeCentral(previewCanvas, card.code, fmt, { width: 2, height: 60 }, errorDiv);
+    };
+    formatSelect.addEventListener("change", renderPreview);
+    renderPreview(); // initial
+
+    // --- buttons ---
+    dialog.querySelector("#cancel-btn").addEventListener("click", () => dialog.remove());
+
+    dialog.querySelector("#save-btn").addEventListener("click", async () => {
+      const newName = nameInput.value;
+      const newFormat = formatSelect.value;
+
+      const updated = await this._hass.callApi("put", `cardwallet/${card.card_id}`, {
+        user_id: card.user_id,
+        name: newName,
+        format: newFormat
+      });
+
+      // locally update caches
+      this.ownCards = this.ownCards.map((c) =>
+        c.card_id === card.card_id ? { ...c, ...updated } : c
+      );
+      this.otherCards = this.otherCards.map((c) =>
+        c.card_id === card.card_id ? { ...c, ...updated } : c
+      );
+
+      // if card is open, refresh the live canvas + title
+      if (this.selectedCard && this.selectedCard.card_id === card.card_id) {
+        this.selectedCard = { ...this.selectedCard, ...updated };
+
+        const container = this.dynamicContainer.querySelector("#code-preview");
+        if (container) {
+          const canvas = document.createElement("canvas");
+          container.innerHTML = "";
+          container.appendChild(canvas);
+
+          const fmt = this.selectedCard.format || "CODE128";
+          renderBarcodeCentral(canvas, this.selectedCard.code, fmt);
+        }
+
+        const titleEl = this.dynamicContainer.querySelector(".card-title");
+        if (titleEl) titleEl.textContent = this.selectedCard.name;
+      }
+
+      dialog.remove();
+    });
   }
 
   render() {
@@ -167,32 +314,23 @@ class CardWalletCard extends HTMLElement {
       const mode = this.viewModes[this.selectedCard.card_id] || "barcode";
       const container = this.dynamicContainer.querySelector("#code-preview");
       container.innerHTML = "";
+
       if (mode === "qr") {
-		  const canvas = document.createElement("canvas");
-		  container.appendChild(canvas);
-
-		  QRCode.toCanvas(
-			canvas,
-			this.selectedCard.code,
-			{
-			  width: 160,
-			  margin: 1,
-			},
-			(error) => {
-			  if (error) console.error("QR generation error:", error);
-			},
-		  );
-		} else {
-		  const canvas = document.createElement("canvas");
-		  container.appendChild(canvas);
-
-		  const sanitizedCode = this.selectedCard.code
-			.normalize("NFD")
-			.replace(/[\u0300-\u036f]/g, "")
-			.replace(/[^a-zA-Z0-9]/g, "");
-
-		  JsBarcode(canvas, sanitizedCode, { format: "CODE128", width: 5, height: 80 });
-		}
+        const canvas = document.createElement("canvas");
+        container.appendChild(canvas);
+        QRCode.toCanvas(
+          canvas,
+          this.selectedCard.code,
+          { width: 160, margin: 1 },
+          (error) => { if (error) console.error("QR generation error:", error); },
+        );
+      } else {
+        const canvas = document.createElement("canvas");
+        container.appendChild(canvas);
+        const fmt = this.selectedCard.format || "CODE128";
+        // központi render (nincs duplikált try/catch)
+        renderBarcodeCentral(canvas, this.selectedCard.code, fmt);
+      }
 
       this.dynamicContainer.querySelector("#toggle-code")
         ?.addEventListener("click", () => this.toggleCodeType(this.selectedCard.card_id));
